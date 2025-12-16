@@ -1,0 +1,116 @@
+{
+    "feat_cols": [
+        "abs_delta_gc_tr_flank",
+        "delta_gc_tr_flank",
+        "delta_gc_tr_motif",
+        "dist_to_cds",
+        "dist_to_exon",
+        "dist_to_tss",
+        "flank_gc_1k",
+        "gene_len",
+        "gene_rel_pos",
+        "in_exon",
+        "is_pentanuc",
+        "is_trinuc",
+        "log_motif_gc",
+        "log_repeat_units",
+        "log_str_density_ratio",
+        "log_tr_gc",
+        "log_tr_len",
+        "motif_at",
+        "motif_has_cpg",
+        "motif_len",
+        "motif_purine_frac",
+        "motif_pyrimidine_frac",
+        "near_tss_1k",
+        "near_tss_5k",
+        "norm_dist_tss",
+        "repeat_units",
+        "str_density_1000",
+        "str_density_10000",
+        "str_density_ratio",
+        "tr_len"
+    ],
+    "models_params": [
+        {
+            "learning_rate": 0.49733006799072094,
+            "depth": 4,
+            "l2_leaf_reg": 18.265150594068462,
+            "rsm": 0.7685637863417092,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2025
+        },
+        {
+            "learning_rate": 0.05255080658220759,
+            "depth": 4,
+            "l2_leaf_reg": 5.5015004227422475,
+            "rsm": 0.5133032671325745,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2026
+        },
+        {
+            "learning_rate": 0.03280488535279088,
+            "depth": 5,
+            "l2_leaf_reg": 21.17297913401662,
+            "rsm": 0.7646162507339521,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2027
+        },
+        {
+            "learning_rate": 0.40085614977851897,
+            "depth": 3,
+            "l2_leaf_reg": 8.530748604298235,
+            "rsm": 0.9959843225564096,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2028
+        },
+        {
+            "learning_rate": 0.010952511475500918,
+            "depth": 6,
+            "l2_leaf_reg": 18.018340390255457,
+            "rsm": 0.7698402175306526,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2029
+        },
+        {
+            "learning_rate": 0.43854295706433605,
+            "depth": 9,
+            "l2_leaf_reg": 14.16702467800363,
+            "rsm": 0.5282326246861979,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2030
+        },
+        {
+            "learning_rate": 0.2429925880303143,
+            "depth": 8,
+            "l2_leaf_reg": 4.704482253404685,
+            "rsm": 0.6811958421276845,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2031
+        },
+        {
+            "learning_rate": 0.003750868510781475,
+            "depth": 4,
+            "l2_leaf_reg": 5.23172096636459,
+            "rsm": 0.7420356813665413,
+            "loss_function": "Logloss",
+            "verbose": false,
+            "allow_writing_files": false,
+            "random_state": 2032
+        }
+    ]
+}
