@@ -1,2 +1,1 @@
-data/processed/genome_annotations.db
-models/trepp_production.pkl
+echo ".DS_Store" >> .gitignore
