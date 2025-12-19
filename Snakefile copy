@@ -1,22 +1,43 @@
 configfile: "config/config.yaml"
 
-# ---------------------------------------------------------------------
-# Feature Extraction
-# ---------------------------------------------------------------------
-rule extract_features:
+rule all:
     input:
-        bed = config["datasets"]["predict"],
+        "results/performance_benchmark.csv",
+        "results/loco_performance.csv",
+        "results/ablation_study.csv" 
+
+# ---------------------------------------------------------------------
+# 1. 构建数据库 (Build Database)
+# ---------------------------------------------------------------------
+rule build_database:
+    input:
+        gff = config["annotations"]["gff"],
+    output:
+        db = config["processed"]["db"]
+    params:
+        script = "scripts/build_database.py"
+    shell:
+        "python {params.script} --gff {input.gff} --gnomad {input.gnomad} --out {output.db}"
+
+# ---------------------------------------------------------------------
+# 2. 特征提取 (Unified Feature Extraction)
+# ---------------------------------------------------------------------
+# 现在只需要输入 BED, FASTA 和 DB
+rule extract_features_train:
+    input:
+        bed = config["datasets"]["train"],
         ref = config["reference"]["fasta"],
         db = config["processed"]["db"],
-        trf = config["paths"]["trf_binary"]
+        trf = config["paths"]["trf_binary"]  # 确保这是一个文件路径
     output:
-        features = config["processed"]["predict_features"]
+        features = config["processed"]["train_features"]
     params:
         script = "scripts/extract_features.py"
     log:
-        "logs/extract_features.log"
+        "logs/extract_features_train.log"
     shell:
         """
+        # 给 TRF 加执行权限，防止 Permission denied
         chmod +x {input.trf}
         
         python {params.script} \
