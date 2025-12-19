@@ -42,9 +42,6 @@ python trepp_predict.py -h
 python trepp_predict.py \
   --input-bed data/predict.bed \
   --ref-fasta data/reference.fa \
-  --db-path data/annotations.db \
-  --trf-path bin/trf \
-  --model model/trepp_final.pkl \
   --outdir out/predict_run_001
 ```
 
@@ -59,24 +56,22 @@ If you want a custom filename, still keep it inside the run folder:
 
 ```bash
 python trepp_predict.py \
-  --features data/features.csv \
-  --model model/trepp_final.pkl \
+  --input-bed data/predict.bed \
+  --ref-fasta data/reference.fa \
   --outdir out/predict_run_002 \
   --pred-out out/predict_run_002/custom_predictions.tsv
 ```
 
 ### Thresholding
 
-If `--threshold` is omitted, the script uses:
-1) `meta_info.best_threshold` if present in the model artifact
-2) otherwise `0.5`
+If `--threshold` is omitted, the script default use `0.5`.
 
 Custom threshold:
 
 ```bash
 python trepp_predict.py \
-  --features data/features.csv \
-  --model model/trepp_final.pkl \
+  --input-bed data/predict.bed \
+  --ref-fasta data/reference.fa \
   --outdir out/predict_run_003 \
   --threshold 0.35
 ```
