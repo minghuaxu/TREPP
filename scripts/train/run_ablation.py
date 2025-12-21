@@ -1,38 +1,349 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-TREPP Ablation Study (V7 Based)
-===============================
-功能：
-1. 定义特征组 (Gene vs Seq)。
-2. 依次移除特定特征组，重新训练 TREPP V7 模型。
-3. 输出每次消融的性能指标和预测结果 (id, prob)。
-"""
-
 import argparse
 import os
 import sys
 import logging
+from optuna.samplers import TPESampler  # [修改点1] 引入采样器
 import numpy as np
 import pandas as pd
 import joblib
 from sklearn.metrics import average_precision_score, roc_auc_score, f1_score
+from catboost import CatBoostClassifier
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.metrics import (
+    average_precision_score,
+    roc_auc_score,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 
-# 复用 train_final_v7.py 中的核心逻辑
-# 假设 train_final_v7.py 在 scripts/ 目录下，且名为 train_final_v7.py
-# 如果文件名不同，请修改下面的 import
-try:
-    from trepp_v7_macro_2 import (
-        load_data, 
-        setup_logger, 
-        select_features, 
-        train_base_models, 
-        train_meta_learner,
-        SEED
+import optuna
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.linear_model import LogisticRegression
+import time
+
+SEED =2025
+
+def setup_logger(out_dir: str) -> logging.Logger:
+    os.makedirs(out_dir, exist_ok=True)
+    log_file = os.path.join(out_dir, f"training_v7_macro_{time.strftime('%m%d_%H%M')}.log")
+    logger = logging.getLogger("TREPP_V7")
+    logger.setLevel(logging.INFO)
+
+    if logger.handlers:
+        logger.handlers = []
+
+    fh = logging.FileHandler(log_file)
+    sh = logging.StreamHandler()
+    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
+    fh.setFormatter(formatter)
+    sh.setFormatter(formatter)
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+    return logger
+
+def load_data(csv_path: str, logger: logging.Logger):
+    logger.info(f"Loading {csv_path}...")
+    df = pd.read_csv(csv_path)
+    y = df["label"].values.astype(int)
+
+    df['id'] = df['chr'].astype(str) + '_' + df['start'].astype(str) + '_' + df['end'].astype(str) + '_' + df['motif'].astype(str)
+
+    meta_cols = ["chr", "start", "end", "motif", "gene_name", "label", "id", "oe_lof", "pLI", "tr_gc", "motif_gc"]
+    # [修改点3] 排序特征列，防止因读取顺序不同导致的特征错位
+    feat_cols = sorted([c for c in df.columns if c not in meta_cols])
+
+    X = df[feat_cols].values.astype(float)
+    return X, y, feat_cols
+
+def select_features(X: np.ndarray, y: np.ndarray, feature_names, logger: logging.Logger, top_k: int = 50):
+    """
+    使用一个快速的 CatBoost 模型筛选特征，保留重要性最高的 Top-K 个特征。
+    """
+    logger.info(f"\n=== Feature Selection (Keeping Top {top_k}) ===")
+    
+    # 训练一个快速模型用于评估重要性
+    # 这里的参数可以设得简单一点，速度优先
+    quick_model = CatBoostClassifier(
+        iterations=500,
+        learning_rate=0.1,
+        depth=6,
+        random_seed=SEED,
+        verbose=False,
+        allow_writing_files=False,
+        auto_class_weights="Balanced"
     )
-except ImportError:
-    print("Error: Could not import trepp_v7_macro_2.py. Please ensure it is in the same directory or PYTHONPATH.")
-    sys.exit(1)
+    
+    quick_model.fit(X, y)
+    
+    # 获取特征重要性
+    importances = quick_model.get_feature_importance()
+    
+    # 创建 DataFrame 方便排序
+    df_imp = pd.DataFrame({"feature": feature_names, "importance": importances})
+    df_imp = df_imp.sort_values("importance", ascending=False)
+    
+    # 打印前 10 个最重要的特征
+    logger.info("Top 10 Important Features:")
+    for i, row in df_imp.head(20).iterrows():
+        logger.info(f"  {row['feature']:<25} : {row['importance']:.4f}")
+        
+    # 选出 Top K 的特征名称
+    selected_feat_names = set(df_imp.head(top_k)["feature"].values)
+    
+    # 找到这些特征对应的原始索引列号
+    selected_indices = [i for i, f in enumerate(feature_names) if f in selected_feat_names]
+    selected_names_sorted = [feature_names[i] for i in selected_indices]
+    
+    logger.info(f"Dropped {len(feature_names) - len(selected_indices)} features. Remaining: {len(selected_indices)}")
+    
+    return np.array(selected_indices), selected_names_sorted
+
+
+def tune_catboost(X, y, idx: int, n_trials: int, random_seed, logger: logging.Logger):
+    logger.info(f"Tuning Base Model {idx + 1} with seed {random_seed}...")
+
+    pos_idx = np.where(y == 1)[0]
+    neg_idx = np.where(y == 0)[0]
+
+    np.random.seed(random_seed)
+    np.random.shuffle(neg_idx)
+    sample_neg = neg_idx[: len(pos_idx) * 2]
+
+    curr_X = np.vstack([X[pos_idx], X[sample_neg]])
+    curr_y = np.hstack([y[pos_idx], y[sample_neg]])
+
+    def obj(trial):
+        params = {
+            "iterations": 2000,
+            "learning_rate": trial.suggest_float("learning_rate", 0.001, 0.5, log=True),
+            "depth": trial.suggest_int("depth", 2, 10),
+            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 2, 200, log=True),
+            "verbose": False,
+            "allow_writing_files": False,
+            "rsm": trial.suggest_float("rsm", 0.5, 1.0),
+            "grow_policy": "Lossguide",
+            "eval_metric": "Precision",
+            "loss_function": "Logloss",
+            "auto_class_weights": "Balanced",
+            "random_state": random_seed, # CatBoost 内部种子
+            "thread_count": -1, # [可选] 限制线程数有助于减少并行计算浮点误差带来的微小差异
+        }
+
+        # 这里的 SKF 需要固定随机种子
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_seed)
+        scores = []
+        for tr, val in skf.split(curr_X, curr_y):
+            model = CatBoostClassifier(**params)
+            model.fit(
+                curr_X[tr],
+                curr_y[tr],
+                eval_set=(curr_X[val], curr_y[val]),
+                early_stopping_rounds=20,
+                verbose=False,
+            )
+            preds = model.predict_proba(curr_X[val])[:, 1]
+            if np.isnan(preds).any():
+                return 0.0
+            scores.append(average_precision_score(curr_y[val], preds))
+        return float(np.mean(scores))
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    
+    # [修改点1] 关键：Optuna 必须使用带 Seed 的 Sampler 才能复现搜索结果
+    sampler = TPESampler(seed=random_seed) 
+    study = optuna.create_study(direction="maximize", sampler=sampler)
+    
+    study.optimize(obj, n_trials=n_trials, show_progress_bar=False)
+
+    bp = study.best_params
+    bp.update(
+        {
+            "loss_function": "Logloss",
+            "verbose": False,
+            "allow_writing_files": False,
+            "random_state": random_seed,
+        }
+    )
+    return bp
+
+
+def train_base_models(
+    X: np.ndarray,
+    y: np.ndarray,
+    n_models: int,
+    n_trials: int,
+    model_dir: str,
+    logger: logging.Logger,
+):
+    logger.info(f"\n=== Training {n_models} Base Models (CatBoost) ===")
+
+    neg_idx = np.where(y == 0)[0]
+    pos_idx = np.where(y == 1)[0]
+    pos_n = len(pos_idx)
+
+    models = []
+    oof_preds = np.zeros((len(X), n_models))
+    scores = []
+
+    for i in range(n_models):
+        current_seed = SEED + i
+        np.random.seed(current_seed)
+        np.random.shuffle(neg_idx)
+        curr_neg = np.random.choice(
+            neg_idx, size=min(len(neg_idx), pos_n * 2), replace=False
+        )
+        curr_idx = np.concatenate([pos_idx, curr_neg])
+
+        params = tune_catboost(X, y, i, n_trials, current_seed, logger)
+
+        base_est = CatBoostClassifier(**params)
+
+        # [修改点2] 创建固定的 CV 对象，而不是只传数字 cv=5
+        # 这样能保证 Platt Scaling 内部 fold 的划分每次都完全一样
+        cv_strategy = StratifiedKFold(n_splits=5, shuffle=True, random_state=current_seed)
+
+        calibrated = CalibratedClassifierCV(
+            estimator=base_est, method="sigmoid", cv=cv_strategy, n_jobs=1
+        )
+        calibrated.fit(X[curr_idx], y[curr_idx])
+
+        subset_oof = cross_val_predict(
+            calibrated,
+            X[curr_idx],
+            y[curr_idx],
+            cv=cv_strategy, # 同样使用固定的 CV 对象
+            method="predict_proba",
+            n_jobs=1,
+        )[:, 1]
+
+        full_pred = calibrated.predict_proba(X)[:, 1]
+        full_pred[curr_idx] = subset_oof
+
+        oof_preds[:, i] = full_pred
+        models.append(calibrated)
+
+        score = average_precision_score(y, full_pred)
+        scores.append(score)
+        logger.info(f"Model {i + 1} OOF AUPRC: {score:.4f}")
+
+        joblib.dump(calibrated, os.path.join(model_dir, f"base_{i}.pkl"))
+
+    return models, oof_preds, np.array(scores)
+
+def scan_thresholds_macro(
+    y_true: np.ndarray,
+    y_probs: np.ndarray,
+    logger: logging.Logger = None,
+    prefix: str = "",
+    thresholds: np.ndarray = None,
+):
+    if thresholds is None:
+        thresholds = np.arange(0.1, 0.95, 0.05)
+
+    best_f1_macro = 0.0
+    best_th = 0.5
+
+    if logger:
+        logger.info(f"\n--- {prefix} Threshold Scan (Macro F1) ---")
+        logger.info(f"{'Thresh':<10} | {'F1_pos':<10} | {'F1_neg':<10} | {'F1_macro':<10} | {'Prec':<10} | {'Recall':<10}")
+        logger.info("-" * 80)
+
+    for th in thresholds:
+        preds = (y_probs >= th).astype(int)
+        f1_pos = f1_score(y_true, preds, zero_division=0, average="binary")
+        f1_neg = f1_score(1 - y_true, 1 - preds, zero_division=0, average="binary")
+        f1_macro = 0.5 * (f1_pos + f1_neg)
+
+        prec = precision_score(y_true, preds, zero_division=0, average="macro")
+        rec = recall_score(y_true, preds, zero_division=0, average="macro")
+
+        if f1_macro > best_f1_macro:
+            best_f1_macro = f1_macro
+            best_th = th
+
+        if logger:
+            logger.info(
+                f"{th:.2f}       | {f1_pos:.4f}   | {f1_neg:.4f}   | {f1_macro:.4f}   | {prec:.4f}   | {rec:.4f}"
+            )
+
+    if logger:
+        logger.info("-" * 80)
+        logger.info(
+            f"Best Threshold (F1_macro): {best_th:.2f} -> Max F1_macro: {best_f1_macro:.4f}"
+        )
+
+    return best_th, best_f1_macro
+
+def train_meta_learner(
+    oof: np.ndarray,
+    y: np.ndarray,
+    scores: np.ndarray,
+    model_dir: str,
+    logger: logging.Logger,
+):
+    logger.info("\n=== Meta Learner Training (Logistic Regression + Macro F1) ===")
+    logger.info("Pruning disabled. Using ALL base models in stacking.")
+    
+    selected_idx = np.arange(oof.shape[1])
+    X_meta = oof[:, selected_idx]
+
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+    meta_oof = np.zeros(len(y))
+
+    for fold, (tr_idx, val_idx) in enumerate(skf.split(X_meta, y), start=1):
+        # logger.info(f"Meta fold {fold} / 5 ...")
+        meta_model = LogisticRegression(
+            penalty="l1",
+            solver="liblinear",
+            C=0.5,
+            class_weight="balanced",
+            max_iter=200,
+            random_state=SEED + fold, # LR 自身也是确定的
+        )
+        meta_model.fit(X_meta[tr_idx], y[tr_idx])
+        meta_oof[val_idx] = meta_model.predict_proba(X_meta[val_idx])[:, 1]
+
+    best_th, best_f1_macro = scan_thresholds_macro(
+        y, meta_oof, logger, prefix="Train Set (Meta OOF)"
+    )
+
+    final_meta_model = LogisticRegression(
+        penalty="l1",
+        solver="liblinear",
+        C=0.3,
+        class_weight="balanced",
+        max_iter=200,
+        random_state=SEED,
+    )
+
+    calibrated = CalibratedClassifierCV(
+        estimator=final_meta_model, method="sigmoid", cv=3, n_jobs=1
+    )
+    calibrated.fit(X_meta, y)
+    
+    final_meta_model.fit(X_meta, y)
+    final_meta_model = calibrated
+
+    meta_info = {
+        "selected_idx": selected_idx,
+        "meta_model": final_meta_model,
+        "threshold": float(best_th),
+        "best_f1_macro_train": float(best_f1_macro),
+    }
+    joblib.dump(meta_info, os.path.join(model_dir, "meta_info_v7.pkl"))
+
+    with open(os.path.join(model_dir, "best_threshold_macro_v7.txt"), "w") as f:
+        f.write(f"{best_th:.6f}\n")
+
+    logger.info(
+        f"Meta training done. Best train macro F1 = {best_f1_macro:.4f} @ threshold = {best_th:.2f}"
+    )
+    return meta_info
+
+
 
 # ==========================================
 # 1. 定义特征分组逻辑
