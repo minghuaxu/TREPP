@@ -1,1 +1,16 @@
-echo ".DS_Store" >> .gitignore
+.DS_Store
+
+# 忽略所有数据库文件
+*.db
+*.sqlite
+
+# 忽略所有机器学习模型和实验结果
+*.pkl
+*.pt
+*.pth
+*.h5
+
+# 如果你只想忽略这三个特定的文件，可以写绝对相对路径：
+# src/train/experiments/trepp_experiments.pkl
+# data/genome_annotations.db
+# src/models/trepp_production.pkl
