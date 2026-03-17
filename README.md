@@ -70,10 +70,10 @@ python trepp_predict.py -h
 #### Predict directly from BED
 ```bash
 python src/trepp_predict.py \
-  --ref-fasta demo/hg19_demo.fa \
-  --input-bed demo/demo.bed \
+  --ref-fasta example/hg19_example.fa \
+  --input-bed example/example.bed \
   --db-path data/genome_annotations.db \
-  --outdir demo/out/predict_run_001
+  --outdir example/out/predict_run_001
 ```
 
 Artifacts produced:
@@ -85,8 +85,8 @@ Artifacts produced:
 If you want a custom filename, still keep it inside the run folder:
 ```bash
 python src/trepp_predict.py \
-  --ref-fasta demo/hg19_demo.fa \
-  --input-bed demo/demo.bed \
+  --ref-fasta example/hg19_example.fa \
+  --input-bed example/example.bed \
   --db-path data/genome_annotations.db \
   --outdir out/predict_run_002 \
   --pred-out out/predict_run_002/custom_predictions.tsv
@@ -97,8 +97,8 @@ If `--threshold` is omitted, the script defaults to use `0.5`.
 Custom threshold:
 ```bash
 python trepp_predict.py \
-  --ref-fasta demo/hg19_demo.fa \
-  --input-bed demo/demo.bed \
+  --ref-fasta example/hg19_example.fa \
+  --input-bed example/example.bed \
   --db-path data/genome_annotations.db \
   --outdir out/predict_run_003 \
   --threshold 0.35
