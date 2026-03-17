@@ -1,9 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-TREPP SHAP Analysis Tool
-========================
-原理：计算所有基模型(Base Models)的 SHAP 值并取平均，以解释集成模型的决策逻辑。
+计算所有基模型的 SHAP 值并取平均，以解释集成模型的决策逻辑。
 """
 
 import argparse
@@ -16,12 +12,9 @@ import shap
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from matplotlib.colors import LinearSegmentedColormap
-
-# 必须导入，否则 pickle 加载会报错
 from catboost import CatBoostClassifier
 
-# 设置全局绘图参数 (作为基础配置)
-# 注意：这通常需要在 plt.figure() 之前设置
+# 设置全局绘图参数, 在 plt.figure() 之前设置
 PLOT_CONFIG = {
     'font.size': 18,
     'axes.titlesize': 20,
@@ -78,7 +71,7 @@ def main():
     for i, model in enumerate(tqdm(base_models, desc="Explaining Models")):
         # 处理 CalibratedClassifierCV 包装的情况
         if hasattr(model, 'calibrated_classifiers_'):
-            # 使用第一个 fold 的 estimator 来解释 (通常足够代表性)
+            # 使用第一个 fold 的 estimator 来解释
             model = model.calibrated_classifiers_[0].estimator
 
         explainer = shap.TreeExplainer(model)
@@ -92,8 +85,7 @@ def main():
     
     print("SHAP calculation done.")
 
-    # 5. 绘图 (增强版)
-    
+    # 5. 绘图
     custom_colors = ["#7FADCA", "#E67C71"] # 蓝红配色
     custom_cmap = LinearSegmentedColormap.from_list("custom", custom_colors)
     
@@ -113,7 +105,7 @@ def main():
         plot_size=None
     )
     
-    # [关键修复] 强制修改当前 Axes 的属性
+    # 强制修改当前 Axes 的属性
     ax = plt.gca()
     
     # 1. 修改特征名 (Y轴) 字体大小
@@ -123,8 +115,7 @@ def main():
     # 3. 修改 X 轴标签
     ax.set_xlabel("SHAP value", fontsize=20, labelpad=10)
     
-    # 4. 修改 Colorbar 字体 (SHAP 的 Colorbar 是独立的 Axes)
-    # 通常它是 figure 中的最后一个 axes
+    # 4. 修改 Colorbar 字体 (SHAP 的 Colorbar 是独立的, 通常它是 figure 中的最后一个 axes)
     if len(fig.axes) > 1:
         cbar_ax = fig.axes[-1]
         cbar_ax.tick_params(labelsize=20)
@@ -150,7 +141,7 @@ def main():
         color="#7FADCA"
     )
     
-    # [关键修复] 强制修改属性
+    # 强制修改属性
     ax = plt.gca()
     ax.tick_params(axis='y', labelsize=20) # 特征名
     ax.tick_params(axis='x', labelsize=20) # SHAP值
@@ -171,7 +162,7 @@ if __name__ == "__main__":
     main()
 
 # python scripts/analyze_shap.py \
-#     --input data/processed/eval_features.csv \
-#     --model data/models_2/trepp_final.pkl \
+#     --input processed/eval_features.csv \
+#     --model trepp_final.pkl \
 #     --out_dir results/shap_plots \
 #     --samples 2000

@@ -27,7 +27,7 @@ def main():
     ).reset_index()
     agg['prop_pct'] = agg['prop_functional'] * 100
     
-    # 修复 NaN 问题
+    # 去除NaN
     agg_clean = agg.dropna(subset=['mean_score', 'prop_pct'])
     
     if len(agg_clean) < 2:

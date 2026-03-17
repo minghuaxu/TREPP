@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 import argparse
 import os
 import stat
@@ -12,31 +9,39 @@ import joblib
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
-# Required for joblib/pickle deserialization (do not remove)
-from catboost import CatBoostClassifier  # noqa: F401
-from sklearn.calibration import CalibratedClassifierCV  # noqa: F401
+from catboost import CatBoostClassifier
+from sklearn.calibration import CalibratedClassifierCV
 
 
 def build_parser() -> argparse.ArgumentParser:
+
+    # 获取当前脚本所在目录 (trepp/src)
+    src_dir = Path(__file__).resolve().parent
+
     p = argparse.ArgumentParser(
         prog="trepp_predict.py",
-        description="TREPP V7 end-to-end prediction: feature extraction (optional) + stacked inference.",
+        description="TREPP.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     # Core
-    p.add_argument("-m", "--model", required=True, default="models/trepp_production.pkl", help="Path to trepp_final.pkl (V7 artifact).")
     p.add_argument("--outdir", required=True, help="Output directory (all intermediate + final outputs go here).")
+    
+    default_model = str(src_dir / "models/trepp_production.pkl")
+    p.add_argument("-m", "--model", default=default_model, help="Path to trepp_final.pkl.")
 
     # Input mode A: raw BED -> feature extraction
-    p.add_argument("--input-bed", help="Input BED for prediction (triggers feature extraction).")
-    p.add_argument("--ref-fasta", help="Reference genome FASTA (required with --input-bed).")
-    p.add_argument("--db-path", default="data/processed/genome_annotations.db", help="Path to processed annotations.db (required with --input-bed).")
-    p.add_argument("--trf-path", default="scripts/trf-4.10.0", help="Path to TRF binary (required with --input-bed).")
+    p.add_argument("--input-bed", required=True, help="Input BED for prediction.")
+    p.add_argument("--ref-fasta", required=True, help="Reference genome FASTA.")
+    p.add_argument("--db-path", required=True, help="Path to processed annotations.db.")
+    default_feature_script = str(Path(__file__).resolve().parent / "extract_features.py")
+
+    default_trf = str(src_dir / "trf-4.10.0")
+    p.add_argument("--trf-path", default=default_trf, help="Path to TRF binary.")
+
     p.add_argument(
         "--feature-script",
-        default="scripts/extract_features.py",
+        default=str(src_dir / "extract_features.py"),
         help="Feature extraction script path (used with --input-bed).",
     )
 
@@ -130,20 +135,19 @@ def load_artifact(model_path: str) -> dict:
         raise ValueError(f"Model file is missing keys: {missing} (expecting V7 artifact).")
 
     meta_info = artifact["meta_info"]
-    for k in ("selected_idx", "meta_model"):
-        if k not in meta_info:
-            raise ValueError(f"meta_info is missing key: {k}")
+    if "meta_model" not in meta_info:
+        raise ValueError("meta_info is missing key: meta_model")
 
     return artifact
 
 
-def run_inference(X: np.ndarray, artifact: dict, show_progress: bool) -> np.ndarray:
+def run_inference(X, artifact: dict, show_progress: bool) -> np.ndarray:
     base_models = artifact["base_models"]
     meta_info = artifact["meta_info"]
-    selected_idx = meta_info["selected_idx"]
     meta_model = meta_info["meta_model"]
 
-    n_samples = X.shape[0]
+    X_array = X.values.astype(float) if isinstance(X, pd.DataFrame) else X.astype(float)
+    n_samples = X_array.shape[0]
     n_models = len(base_models)
     base_preds = np.zeros((n_samples, n_models), dtype=float)
 
@@ -152,10 +156,9 @@ def run_inference(X: np.ndarray, artifact: dict, show_progress: bool) -> np.ndar
         iterator = tqdm(iterator, total=n_models, desc="Base models")
 
     for i, model in iterator:
-        base_preds[:, i] = model.predict_proba(X)[:, 1]
+        base_preds[:, i] = model.predict_proba(X_array)[:, 1]
 
-    X_meta = base_preds[:, selected_idx]
-    return meta_model.predict_proba(X_meta)[:, 1]
+    return meta_model.predict_proba(base_preds)[:, 1]
 
 
 def ensure_id(df: pd.DataFrame) -> pd.Series:
@@ -181,7 +184,7 @@ def main() -> int:
     args = build_parser().parse_args()
     outdir = ensure_outdir(args.outdir)
 
-    pred_out = Path(args.pred_out).resolve() if args.pred_out else (outdir / "predictions.tsv")
+    pred_out = Path(args.pred_out).resolve() if args.pred_out else (outdir / "trepp_predicted.tsv")
 
 
     # Need BED mode
@@ -190,7 +193,7 @@ def main() -> int:
     if missing:
         print(
             "[ERROR] Either provide --features, or provide --input-bed plus "
-            "--ref-fasta --db-path --trf-path.",
+            "--ref-fasta --db-path .",
             file=sys.stderr,
         )
         return 1
@@ -244,8 +247,6 @@ def main() -> int:
             "pred_label": (probs >= threshold).astype(int),
         }
     )
-    if "label" in df.columns:
-        out.insert(1, "true_label", df["label"])
 
     pred_out.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(pred_out, sep="\t", index=False)

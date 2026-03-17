@@ -33,7 +33,7 @@ def load_data(csv_path):
 def plot_dim_reduction(X, y, out_dir):
     print("Running Dimensionality Reduction (PCA & t-SNE)...")
     
-    # 标准化 (对降维至关重要)
+    # 标准化
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
@@ -42,8 +42,7 @@ def plot_dim_reduction(X, y, out_dir):
     X_pca = pca.fit_transform(X_scaled)
     var_explained = pca.explained_variance_ratio_
     
-    # 2. t-SNE (更擅长发现非线性聚类)
-    # perplexity 设为 30 或更小 (取决于样本量)
+    # 2. t-SNE 
     perp = min(30, len(X) - 1)
     tsne = TSNE(n_components=2, perplexity=perp, random_state=42, init='pca', learning_rate='auto')
     X_tsne = tsne.fit_transform(X_scaled)
@@ -107,7 +106,7 @@ def plot_top_distributions(X, y, top_features, out_dir):
     # 融化数据以便绘图
     data_melt = data.melt(id_vars='Label', var_name='Feature', value_name='Value')
     
-    # 由于不同特征尺度差异巨大（距离 vs GC含量），我们分图画
+    # 由于不同特征尺度差异巨大（距离 vs GC含量），分图画
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
     axes = axes.flatten()
     
@@ -120,7 +119,7 @@ def plot_top_distributions(X, y, top_features, out_dir):
         axes[i].set_title(feature)
         axes[i].set_xlabel('')
         
-        # 如果是距离特征，可能需要对数坐标看才清楚
+        # 如果是距离特征，需要对数坐标看才清楚
         if 'dist' in feature or 'len' in feature:
             # 检查是否有0，如果有0不能直接log，加1
             if (data[feature] > 0).all():

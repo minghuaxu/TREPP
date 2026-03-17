@@ -6,7 +6,7 @@ import argparse
 from matplotlib.colors import LinearSegmentedColormap
 from utils_load import load_processed_data
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from matplotlib.ticker import FuncFormatter  # [新增] 用于自定义刻度格式
+from matplotlib.ticker import FuncFormatter  # 用于自定义刻度格式
 
 # --- 统一配色 ---
 custom_cmap = LinearSegmentedColormap.from_list("CustomRed", ["#F7F7F7", "#E67C71", "#C0392B"])
@@ -74,7 +74,7 @@ def main():
     ax.set_yticklabels(chroms, fontsize=18)
     ax.invert_yaxis()
     
-    # --- [关键修改]：将 X 轴单位转换为 Mb (百万碱基) ---
+    # 将 X 轴单位转换为 Mb (百万碱基)
     def mb_formatter(x, pos):
         return f'{int(x / 1e6)}' # 将数值除以 1,000,000 并取整
 
@@ -84,7 +84,7 @@ def main():
     ax.set_xlabel('Genomic Position (Mb)', fontsize=18)
     ax.tick_params(axis='both', which='major', labelsize=18)
     
-    # 如果你坚持要用科学计数法且只想改字体大小，注释掉上面三行，使用下面这行：
+    # 使用用科学计数法且只想改字体大小，注释掉上面三行，使用下面这行：
     # ax.xaxis.get_offset_text().set_fontsize(18) 
 
     # --- 颜色条设置 ---
@@ -92,7 +92,7 @@ def main():
                 width="3%",    
                 height="35%",  
                 loc='lower right',  
-                borderpad=10)   # 稍微调整了下位置
+                borderpad=10)  
 
     cbar = plt.colorbar(sc, cax=cax)
     cbar.set_label('Pathogenic Ratio', fontsize=16, labelpad=10)

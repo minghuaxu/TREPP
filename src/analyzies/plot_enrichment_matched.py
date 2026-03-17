@@ -147,16 +147,12 @@ def main():
     for i, row in enumerate(res_df.itertuples()):
         sig = "***" if row.P < 0.001 else "**" if row.P < 0.01 else "*" if row.P < 0.05 else "ns"
         
-        # [修改点] 无论红蓝，文字都放在点的右侧
-        # 这样蓝色文字就不会撞到 Y 轴了
-        
+        # 无论红蓝，文字都放在点的右侧 这样蓝色文字就不会撞到 Y 轴了
         if row.OR > 1:
             pos_x = row.Upper + text_offset
             txt_color = COLOR_RED
         else:
-            # 对于蓝色 (OR < 1)，Error bar 通常很短或接近0
-            # 我们把它放在 OR 值 (接近0) 的右侧，加上偏移量
-            # 这样它会显示在点和参考线(1.0)之间
+            # 对于蓝色 (OR < 1)，Error bar 通常很短或接近0，放在 OR 值 (接近0) 的右侧，加上偏移量，会显示在点和参考线(1.0)之间
             pos_x = max(row.Upper, row.OR) + text_offset
             txt_color = COLOR_BLUE
             

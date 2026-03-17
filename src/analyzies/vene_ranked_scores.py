@@ -9,22 +9,18 @@ plt.rcParams.update({'font.size': 16})
 
 # ================= 配置路径 =================
 # RExPRT 带有分数的原始文件
-REXPRT_SCORE_FILE = "/homeb/xuminghua/STRP3/hg19_genome/pathogenic/intersection_RExPRT/reference_RExPRTscores.txt"
+REXPRT_SCORE_FILE = "reference_RExPRTscores.txt"
 # TREPP 的结果
-# TREPP_CSV = "/homeb/xuminghua/trepp/data/full_gene/trepp_hg19.csv"
-TREPP_CSV = "/homeb/xuminghua/trepp/data/full_gene/trepp_hg19_production.csv"
+TREPP_CSV = "trepp_hg19_production.csv"
 
 # 映射与数据库
-GFF3_FILE = "/homeb/xuminghua/trepp/data/raw/gencode.v49lift37.annotation.gff3"
-OMIM_FILE = "/homeb/xuminghua/trepp/data/raw/mim2gene.txt"
-GENETREK_FILE = "/homeb/xuminghua/STRP3/hg19_genome/pathogenic/genetrek/genetrek-data-2024-04-26.tsv"
+GFF3_FILE = "gencode.v49lift37.annotation.gff3"
+OMIM_FILE = "mim2gene.txt"
+GENETREK_FILE = "genetrek-data-2024-04-26.tsv"
 TOP_K = 10000
 # 输出文件
 OUTPUT_OMIM_IMG = f"venn_omim_top{TOP_K}_ranked.png"
 OUTPUT_GENETREK_IMG = f"venn_genetrek_top{TOP_K}_ranked.png"
-
-# 【关键参数】 取前多少个高分位点进行比较？
-# 建议尝试 1000, 2000, 5000. 这里设为 1000
 
 
 # ================= 1. 基因映射工具 (保持公平，统一使用坐标映射) =================
@@ -93,7 +89,7 @@ def map_loci_to_genes(loci_list, genes_db):
                     mapped_genes.add(g_id)
     return mapped_genes
 
-# ================= 2. 数据加载与排序 (核心逻辑) =================
+# ================= 2. 数据加载与排序 =================
 
 def get_trepp_top_k(csv_path, genes_db, k):
     print(f"\nProcessing TREPP (Top {k})...")
@@ -127,11 +123,8 @@ def get_trepp_top_k(csv_path, genes_db, k):
 
 def get_rexprt_top_k(txt_path, genes_db, k):
     print(f"\nProcessing RExPRT (Top {k})...")
-    # 1. 读取 (Tab分隔)
-    # 假设列名: chr, start, end, ..., ensembleMax
     df = pd.read_csv(txt_path, sep='\t')
     
-    # 2. 排序 (按 ensembleMax 降序)
     # ensembleMax 代表集成的最大概率/分数，通常是最佳排序指标
     if 'ensembleMax' in df.columns:
         sort_col = 'ensembleMax'
@@ -142,11 +135,11 @@ def get_rexprt_top_k(txt_path, genes_db, k):
     
     df_sorted = df.sort_values(by=sort_col, ascending=False)
     
-    # 3. 取前 K
+    # 取前 K
     df_top = df_sorted.head(k)
     print(f"  -> RExPRT Score Range ({sort_col}): {df_top[sort_col].max():.4f} to {df_top[sort_col].min():.4f}")
     
-    # 4. 提取坐标
+    # 提取坐标
     loci = []
     for _, row in df_top.iterrows():
         # 确保 chr 格式统一
@@ -154,7 +147,7 @@ def get_rexprt_top_k(txt_path, genes_db, k):
         if not c.startswith('chr'): c = 'chr' + c
         loci.append((c, int(row['start']), int(row['end'])))
         
-    # 5. 映射基因 (注意：虽然文件里有 gene 列，但为了和 TREPP 公平对比，必须重新映射到 Ensembl ID)
+    # 映射基因，为了和 TREPP 公平对比，重新映射到 Ensembl ID
     # genes = map_loci_to_genes(loci, genes_db)
     genes = map_loci_to_best_gene(loci, genes_db)
     print(f"  -> Mapped to {len(genes)} genes.")

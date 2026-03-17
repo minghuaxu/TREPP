@@ -159,9 +159,9 @@ def train_meta_learner(oof, y, logger):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--json_config", default="best_params.json", help="包含参数的 JSON 文件")
-    parser.add_argument("--train", default="data/processed/train_features.csv")
-    parser.add_argument("--eval", default="data/processed/eval_features.csv")
-    parser.add_argument("--out_dir", default="production_model_json")
+    parser.add_argument("--train", default="../data/processed/train_features.csv")
+    parser.add_argument("--eval", default="../data/processed/eval_features.csv")
+    parser.add_argument("--out_dir", default="./")
     args = parser.parse_args()
 
     logger = setup_logger(args.out_dir)
