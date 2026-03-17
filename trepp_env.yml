@@ -1,0 +1,34 @@
+name: trepp
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - python=3.8
+  - bcftools
+  - samtools
+  - htslib
+  - curl
+  - openssl
+  - pip
+  - pip:
+    - Cython
+    - Mako
+    - MarkupSafe
+    - PyYAML
+    - SQLAlchemy
+    - alembic
+    - biopython
+    - catboost
+    - category-encoders
+    - matplotlib
+    - pandas
+    - numpy
+    - scikit-learn
+    - xgboost
+    - shap
+    - seaborn
+    - plotly
+    - optuna
+    - gseapy
+    - imbalanced-learn
+    - pyfastx
