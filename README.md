@@ -7,7 +7,7 @@
 
 #### 1. Cloning repository
 ```bash
-git clone [https://github.com/minghuaxu/TREPP.git](https://github.com/minghuaxu/TREPP.git)
+git clone https://github.com/minghuaxu/TREPP.git
 cd TREPP
 ```
 
@@ -35,10 +35,10 @@ This file must be downloaded for feature extraction.
 **Example of a quick download command:**
 ```bash
 # Download the database file to the data directory
-wget [https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/genome_annotations.db](https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/genome_annotations.db) -P data/
+wget https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/genome_annotations.db -P data/
 
 # Download the production model to the models directory
-wget [https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/trepp_production.pkl](https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/trepp_production.pkl) -P src/models/
+wget https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/trepp_production.pkl -P src/models/
 ```
 
 ---
