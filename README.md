@@ -41,7 +41,27 @@ wget https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/genome_annotati
 wget https://github.com/minghuaxu/TREPP/releases/download/v1.0.0/trepp_production.pkl -P src/models/
 ```
 
+#### 🧬 GRCh38 (hg38) support
+
+TREPP can also run against the **GRCh38 (hg38)** reference genome. The model architecture is identical to the v1.0.0 release (8 CatBoost base models + logistic meta model, 30 features), so no code changes are required — only swap the annotation database and the model, and provide your own hg38 reference FASTA.
+
+**hg38 assets** (shipped in the `v1.1.0` release):
+* 👉 [genome_annotations_hg38.db](https://github.com/minghuaxu/TREPP/releases/download/v1.1.0/genome_annotations_hg38.db): hg38 annotation database for feature extraction (~86 MB).
+* 👉 [trepp_production_hg38.pkl](https://github.com/minghuaxu/TREPP/releases/download/v1.1.0/trepp_production_hg38.pkl): production model trained on hg38 loci (~73 MB).
+
+```bash
+# Download the hg38 annotation database and model
+wget https://github.com/minghuaxu/TREPP/releases/download/v1.1.0/genome_annotations_hg38.db -P data/
+wget https://github.com/minghuaxu/TREPP/releases/download/v1.1.0/trepp_production_hg38.pkl -P src/models/
+```
+
+Notes for hg38 runs:
+* **Reference FASTA**: download GRCh38 yourself (e.g. `GRCh38.p14.genome.fa` from NCBI) and pass it via `--ref-fasta`. It is not bundled because of its size.
+* **Coordinates**: the input BED must use hg38 coordinates. See `example/hg38_example.bed` for a ready-made example.
+* Keep the hg38 assets under distinct filenames (`genome_annotations_hg38.db`, `trepp_production_hg38.pkl`) so the hg19 assets remain untouched.
+
 ---
+
 ### 📄 Input Format
 
 TREPP accepts standard headerless, tab-separated BED files as input.
@@ -80,6 +100,17 @@ Artifacts produced:
 - `out/predict_run_001/intermediate/predict_features.csv`
 - `out/predict_run_001/logs/extract_features.log`
 - `out/predict_run_001/trepp_predicted.tsv`
+
+#### Predict on GRCh38 (hg38)
+Point `--db-path` and `--model` at the hg38 assets, and pass an hg38 reference FASTA:
+```bash
+python src/trepp_predict.py \
+  --ref-fasta /path/to/GRCh38.p14.genome.fa \
+  --input-bed example/hg38_example.bed \
+  --db-path data/genome_annotations_hg38.db \
+  --model src/models/trepp_production_hg38.pkl \
+  --outdir out/predict_hg38_run_001
+```
 
 #### Override prediction output path
 If you want a custom filename, still keep it inside the run folder:
